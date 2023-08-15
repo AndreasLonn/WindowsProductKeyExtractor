@@ -2,7 +2,7 @@
 
 This tool can be found at [https://windowsproductkeyextractor.andreaslonn.se](https://windowsproductkeyextractor.andreaslonn.se)
 
-Compatible with Windows versions 8 and up. Tested on Windows 10 and 11.
+Compatible with (possibly) all versions of Windows. Tested on Windows 10 and 11.
 
 ## Credits
 
