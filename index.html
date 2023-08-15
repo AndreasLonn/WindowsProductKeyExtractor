@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Product Key Extractor</title>
+    <style>
+        :root {
+            font-family: Arial, Helvetica, sans-serif;
+            color-scheme: dark light;
+        }
+
+        details {
+            border: 0.1em solid;
+            margin: 1em 0;
+            border-radius: 1em;
+        }
+        details summary {
+            padding: 0.8em;
+        }
+        details :nth-child(2) {
+            margin-top: 0;
+        }
+        details details {
+            padding: 0;
+            margin: 0.8em;
+        }
+
+        h2 {
+            margin: 0.5em 0;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        code {
+            background-color: gray;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 0.1em;
+            border-radius: 0.3em;
+        }
+        code.copy {
+            cursor: pointer;
+        }
+        code.copy::after {
+            margin-left: 0.5em;
+            content: '🗐';
+        }
+        label:not(.loading) span.loading {
+            display: none;
+        }
+
+        label[data-help]::after {
+            margin-left: 0.5em;
+            content: '(?)';
+            cursor: pointer;
+        }
+
+        dialog#dialog-copied {
+            position: fixed;
+            bottom: 0.8em;
+            border-radius: 1em;
+            box-shadow: 0 0.2em 0.6em #0009;
+            opacity: 0;
+            animation: 2s dialog-copied-fade;
+        }
+
+        @keyframes dialog-copied-fade {
+            from {
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 1;
+            }
+            80% {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+    </style>
+    <script>
+        function q(elem, parent=document) { return parent.querySelector(elem); }
+        function qs(elems, parent=document) { return parent.querySelectorAll(elems); }
+
+        function extractDigitalProductIdFromString(string) {
+
+            const prefix = '"DigitalProductId"=hex:';
+            const a = string.indexOf(prefix);
+            if (a >= 0) string = string.substring(a + prefix.length);
+
+            const suffix = '"DigitalProductId4"';
+            const b = string.indexOf(suffix);
+            if (b >= 0) string = string.substring(0, b);
+
+            string = string.replaceAll(/(\\| |\n|\r)/g, '');
+
+            return string;
+        }
+
+        /*
+            This function was converted from C#.
+            Original was written by GitHub user mrpeardotnet and can be found at
+            https://github.com/mrpeardotnet/WinProdKeyFinder/blob/master/WinProdKeyFind/KeyDecoder.cs
+        */
+        function decodeProductKeyWin8AndUp(digitalProductId) {
+            let key = "";
+            const keyOffset = 52;
+            let isWin8 = ((digitalProductId[66] / 6) & 1);
+            digitalProductId[66] = ((digitalProductId[66] & 0xf7) | (isWin8 & 2) * 4);
+
+            const digits = "BCDFGHJKMPQRTVWXY2346789";
+            let last = 0;
+            for (let i = 24; i >= 0; i--) {
+                let current = 0;
+                for (let j = 14; j >= 0; j--) {
+                    current = current*256;
+                    current = digitalProductId[j + keyOffset] + current;
+                    digitalProductId[j + keyOffset] = (current/24);
+                    current = Math.floor(current%24);
+                    last = current;
+                }
+                key = digits[current] + key;
+            }
+
+            let keypart1 = key.substring(1, last + 1);
+            let keypart2 = key.substring(last + 1, key.length);
+
+            key = keypart1 + "N" + keypart2;
+
+            let keyStr = key.substring(0, 5);
+
+            for (let i = 1; i * 5 < key.length; i++)
+                keyStr += `-${key.substring(i * 5, i * 5 + 5)}`;
+
+            return keyStr;
+        }
+        /*
+            This function was converted from C#.
+            Original was written by GitHub user mrpeardotnet and can be found at
+            https://github.com/mrpeardotnet/WinProdKeyFinder/blob/master/WinProdKeyFind/KeyDecoder.cs
+        */
+        function decodeProductKeyWin7AndDown(digitalProductId) {
+            const keyStartIndex = 52;
+            const keyEndIndex = keyStartIndex + 15;
+            const digits = [
+                'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'M', 'P', 'Q', 'R',
+                'T', 'V', 'W', 'X', 'Y', '2', '3', '4', '6', '7', '8', '9',
+            ];
+            const decodeLength = 29;
+            const decodeStringLength = 15;
+            let decodedChars = Array.from(new Int8Array(decodeLength));
+            let hexPid = [];
+
+            for (let i = keyStartIndex; i <= keyEndIndex; i++)
+                hexPid.push(digitalProductId[i]);
+
+            for (let i = decodeLength - 1; i >= 0; i--) {
+                // Every sixth char is a separator.
+                if ((i + 1) % 6 == 0)
+                    decodedChars[i] = '-';
+
+                else {
+                    // Do the actual decoding.
+                    let digitMapIndex = 0;
+                    for (let j = decodeStringLength - 1; j >= 0; j--) {
+                        let byteValue = (digitMapIndex << 8) | hexPid[j];
+                        hexPid[j] = Math.floor(byteValue / 24);
+                        digitMapIndex = Math.floor(byteValue % 24);
+                        decodedChars[i] = digits[digitMapIndex];
+                    }
+                }
+            }
+
+            return decodedChars.join('');
+        }
+    </script>
+</head>
+<body>
+    <h1>Find Windows Product Key</h1>
+
+    <p>
+        For (possibly) all versions of Windows. Tested on Windows 10 and 11.<br>
+        To show information about the product key (including the last 5 characters) use command <code class="copy">slmgr /dlv</code> in PowerShell or Command Prompt.
+    </p>
+    <p>
+        NOTE: Always double check using the above command that the extracted product key is the one used by the system.
+        If, for example, the product key has been changed due upgrading from Windows Home to Windows Pro
+        the product key found might be the old one. If that is the case, continue with other methods.
+    </p>
+
+    <details id="instructions">
+        <summary>Instructions</summary>
+
+        <details>
+            <summary>Get product key from PowerShell (Simple)</summary>
+            <ol>
+                <li>Open <code>PowerShell</code></li>
+                <li>Enter command <code class="copy">(Get-WmiObject -query 'select * from SoftwareLicensingService').OA3xOriginalProductKey</code></li>
+                <li>The product key will be printed in the format <code>XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code></li>
+            </ol>
+        </details>
+
+        <details>
+            <summary>Get product key from Command Prompt (Simple)</summary>
+            <ol>
+                <li>Open <code>Command Prompt</code></li>
+                <li>Enter command <code class="copy">wmic path softwarelicensingservice get OA3xOriginalProductKey</code></li>
+                <li>The product key will be printed in the format <code>XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code></li>
+            </ol>
+        </details>
+
+        <details>
+            <summary>Get product key from registry (Advanced)</summary>
+
+            <details>
+                <summary>Extract using PowerShell</summary>
+                <ol>
+                    <li>Open <code>PowerShell</code></li>
+                    <li>Enter command <code class="copy">((Get-ItemPropertyValue -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name DigitalProductId) | ForEach-Object ToString X2) -join ','</code></li>
+                    <li>Copy the output (pairs of two letters or numbers separated by commas) and paste into the "Text" box below</li>
+                    <li>Press the "Decode" button and the product key will be shown in the format <code>XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code></li>
+                </ol>
+            </details>
+
+            <details>
+                <summary>Extract using the Registry Editor</summary>
+                <ol>
+                    <li>Open the <code>Registry Editor</code> (regedit)</li>
+                    <li>Enter path <code class="copy">HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion</code> in the location bar</li>
+                    <li>Right click "CurrentVersion" to the left and click "Export"</li>
+                    <li>Save as a file and upload the file below</li>
+                    <li>Press the "Decode" button and the product key will be shown in the format <code>XXXXX-XXXXX-XXXXX-XXXXX-XXXXX</code></li>
+                </ol>
+            </details>
+        </details>
+    </details>
+
+    <h2>Decoder</h2>
+
+    <form id="form-decode-product-key">
+
+        <label for="form-decode-product-key-file">File<span class="loading"> (Loading...)</span></label>
+        <input id="form-decode-product-key-file" type="file" />
+
+        <label for="form-decode-product-key-text">Text</label>
+        <textarea id="form-decode-product-key-text" rows="10" placeholder="&quot;DigitalProductId&quot;=hex:00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00"></textarea>
+
+        <label for="form-decode-product-key-version" data-help="If you are uncertain which version of Windows you are using, try decoding for both versions and check which matches with the &quot;slmgr /dlv&quot; command in Command Prompt.">Windows Version</label>
+        <select id="form-decode-product-key-version">
+            <option value="win7">Windows 7 or earlier</option>
+            <option selected value="win8">Windows 8 or later</option>
+        </select>
+
+        <label for="form-decode-product-key-result">Decoded Product Key</label>
+        <input id="form-decode-product-key-result" readonly placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
+
+        <button type="submit">Decode</button>
+    </form>
+
+    <dialog id="dialog-copied"><span>Copied!</span></dialog>
+
+    <script>
+        q('form#form-decode-product-key').addEventListener('submit', event => {
+
+            event.preventDefault();
+
+            let string = q('#form-decode-product-key-text', event.target).value;
+            let version = q('#form-decode-product-key-version', event.target).value;
+
+            string = extractDigitalProductIdFromString(string);
+
+            const prodKey = [];
+
+            string.split(',').forEach(str => {
+                const n = parseInt(str, 16);
+                prodKey.push(n);
+            });
+
+            const prodKeyStr = (version === 'win7') ? decodeProductKeyWin7AndDown(prodKey) : decodeProductKeyWin8AndUp(prodKey);
+
+            // console.log("Key", prodKeyStr);
+
+            q('input#form-decode-product-key-result', event.target).value = prodKeyStr;
+        });
+
+        q('form#form-decode-product-key input#form-decode-product-key-file').addEventListener('change', event => {
+            const reader = new FileReader();
+            reader.addEventListener('load', loadEvent => {
+                try {
+                    // Hacky way to convert from UTF-16
+                    let txt = loadEvent.target.result.replaceAll(String.fromCharCode(0), '');
+
+                    txt = extractDigitalProductIdFromString(txt);
+
+                    q('form#form-decode-product-key textarea#form-decode-product-key-text').value = txt;
+
+                    // Hide loading indicator
+                    q('form#form-decode-product-key label[for=form-decode-product-key-file]').classList.toggle('loading', false);
+                } catch(exception) {
+                    alert(exception);
+                }
+            });
+            // Show loading indicator
+            q('form#form-decode-product-key label[for=form-decode-product-key-file]').classList.toggle('loading', true);
+            reader.readAsBinaryString(event.target.files[0]);
+        });
+
+        qs('code.copy').forEach(elem => elem.addEventListener('click', event => {
+            const textToCopy = event.target.textContent;
+
+            // Copy if possible
+            if(navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy);
+
+                q('dialog#dialog-copied').show();
+
+                setTimeout(() => q('dialog#dialog-copied').close(), 3000);
+            }
+
+            // Else use the built-in "prompt" to select text
+            else prompt('Copy', textToCopy);
+        }));
+
+        qs('label[data-help]').forEach(elem => elem.addEventListener('click', event => alert(elem.dataset.help)));
+    </script>
+</body>
+</html>
